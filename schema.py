@@ -1,1 +1,0 @@
-from alx_backend_graphql.schema import schema
