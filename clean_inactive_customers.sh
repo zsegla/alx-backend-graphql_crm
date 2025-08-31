@@ -1,21 +1,21 @@
 #!/bin/bash
 
 # Navigate to the Django project root (adjust path if needed)
-cd "$(dirname "$0")/.."
+PROJECT_DIR="$(dirname "$(dirname "$(realpath "$0")")")"
+cd "$PROJECT_DIR" || exit 1
 
-# Run Django shell command to delete inactive customers and capture output
-deleted_count=$(python3 manage.py shell -c "
-import datetime
-from crm.models import Customer
+# Run Django shell command to delete inactive customers (no orders in the last year)
+DELETED_COUNT=$(echo "
 from django.utils import timezone
+from datetime import timedelta
+from crm.models import Customer
 
-one_year_ago = timezone.now() - datetime.timedelta(days=365)
-inactive_customers = Customer.objects.filter(order__isnull=True) | Customer.objects.exclude(order__created_at__gte=one_year_ago)
-inactive_customers = inactive_customers.distinct()
-count = inactive_customers.count()
-inactive_customers.delete()
+one_year_ago = timezone.now() - timedelta(days=365)
+qs = Customer.objects.filter(orders__isnull=True, created_at__lt=one_year_ago)
+count = qs.count()
+qs.delete()
 print(count)
-" 2>/dev/null)
+" | python3 manage.py shell 2>/dev/null)
 
-# Log the result with timestamp
-echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] Deleted \$deleted_count inactive customers\" >> /tmp/customer_cleanup_log.txt
+# Log output with timestamp
+echo \"$(date '+%Y-%m-%d %H:%M:%S') - Deleted customers: $DELETED_COUNT\" >> /tmp/customer_cleanup_log.txt
